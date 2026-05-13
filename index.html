@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTM Universal Replacer - Dark Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+
+        .drop-zone {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(30, 41, 59, 0.3);
+        }
+        
+        .drop-zone.dragover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            transform: scale(1.01);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+
+        .terminal-log {
+            font-family: 'Fira Code', monospace;
+            background: #000000;
+        }
+
+        .glow-button {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glow-button:not(:disabled):hover {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+        
+        .file-scanned {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen">
+
+    <div class="max-w-5xl mx-auto py-12 px-6">
+        <header class="mb-10 text-center">
+            <div class="inline-block px-3 py-1 mb-4 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold tracking-widest uppercase">
+                Pro Tools v2.0
+            </div>
+            <h1 class="text-4xl font-extrabold text-white tracking-tight mb-2">
+                Editor Global <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">OTM</span>
+            </h1>
+            <p class="text-slate-400 max-w-lg mx-auto">
+                Herramienta de alto rendimiento para reemplazo masivo en migraciones y archivos de datos.
+            </p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Columna Izquierda: Carga y Configuración -->
+            <div class="lg:col-span-2 space-y-6">
+                <section class="glass-panel rounded-2xl p-6 shadow-2xl">
+                    <!-- Zona de Carga -->
+                    <div id="dropZone" class="drop-zone rounded-xl p-10 text-center cursor-pointer border-2 border-dashed border-slate-700 hover:border-slate-500 mb-6 group">
+                        <input type="file" id="fileInput" class="hidden" accept=".zip,.csv,.xml,.txt">
+                        
+                        <div id="dropZoneContent" class="space-y-4">
+                            <div class="w-16 h-16 mx-auto bg-slate-800 rounded-2xl flex items-center justify-center group-hover:bg-blue-600/20 group-hover:text-blue-400 transition-all">
+                                <svg class="w-8 h-8 text-slate-400 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-lg font-semibold text-white">Suelte su archivo aquí</p>
+                                <p class="text-sm text-slate-500">Paquetes ZIP o archivos individuales (CSV, XML, TXT)</p>
+                            </div>
+                        </div>
+
+                        <div id="fileInfo" class="hidden text-left bg-blue-500/5 p-4 rounded-xl border border-blue-500/20">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center space-x-3">
+                                    <div class="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                                        <svg id="fileIcon" class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"></svg>
+                                    </div>
+                                    <div>
+                                        <p id="fileNameDisplay" class="text-blue-100 font-bold text-sm truncate max-w-[200px]">nombre_archivo</p>
+                                        <p id="fileSizeDisplay" class="text-blue-400/60 text-xs">Calculando...</p>
+                                    </div>
+                                </div>
+                                <button id="removeFile" class="p-2 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded-lg transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inputs Dinámicos -->
+                    <div id="patternsContainer" class="space-y-4 mb-6">
+                        <!-- Se generará vía JS -->
+                    </div>
+
+                    <button id="addPatternBtn" class="flex items-center space-x-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors mb-6 group">
+                        <div class="p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 border border-blue-500/20">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </div>
+                        <span>Añadir otro patrón</span>
+                    </button>
+                </section>
+
+                <!-- Botón Principal -->
+                <button id="processBtn" disabled class="glow-button w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-lg shadow-xl disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed">
+                    Procesar y Descargar Resultados
+                </button>
+            </div>
+
+            <!-- Columna Derecha: Panel de Info y Logs -->
+            <div class="space-y-6">
+                <!-- Panel de Coincidencias en Vivo -->
+                <section id="livePreview" class="glass-panel rounded-2xl p-5 flex flex-col h-[320px]">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Escaneo en Vivo</h3>
+                        <span id="totalMatches" class="bg-slate-800 text-slate-500 text-[10px] font-black px-2 py-1 rounded-full uppercase">0 Encontrados</span>
+                    </div>
+                    <div id="matchesList" class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                        <div class="py-20 text-center flex flex-col items-center justify-center opacity-30">
+                            <svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            <p class="text-xs">Esperando búsqueda...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Terminal de Status -->
+                <section id="statusBox" class="glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Terminal de Sistema</h3>
+                        <div class="flex space-x-1">
+                            <div class="w-2 h-2 rounded-full bg-red-500/50"></div>
+                            <div class="w-2 h-2 rounded-full bg-yellow-500/50"></div>
+                            <div class="w-2 h-2 rounded-full bg-emerald-500/50"></div>
+                        </div>
+                    </div>
+                    <div id="logs" class="terminal-log p-4 rounded-xl text-[10px] leading-relaxed text-emerald-500/80 h-48 overflow-y-auto custom-scrollbar">
+                        <span class="text-emerald-500/40 font-mono italic">Replacer OS v2.0 initialized...</span><br>
+                        <span class="text-emerald-500/40 font-mono italic">Waiting for file upload...</span>
+                    </div>
+                </section>
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- Modal de Detalles de Reemplazo -->
+    <div id="detailsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" id="modalOverlay"></div>
+        <div class="glass-panel w-full max-w-4xl max-h-[80vh] rounded-3xl overflow-hidden flex flex-col relative shadow-2xl border border-slate-700">
+            <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Detalles de Reemplazo: <span id="modalFileName" class="text-blue-400 ml-2 font-mono text-sm">archivo.xml</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1 uppercase tracking-widest font-semibold">Revise y desactive los reemplazos individuales</p>
+                </div>
+                <button id="closeModal" class="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-all">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div id="modalMatchesList" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-slate-950/30">
+                <!-- Matches detailed here -->
+            </div>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end">
+                <button id="confirmDetails" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20">
+                    Cerrar Detalle
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-12 text-center">
+            <p class="text-slate-600 text-xs tracking-tighter">
+                &copy; 2024 CloudMigration Labs &bull; Procesamiento local en navegador de alta seguridad.
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const fileSizeDisplay = document.getElementById('fileSizeDisplay');
+        const processBtn = document.getElementById('processBtn');
+        const patternsContainer = document.getElementById('patternsContainer');
+        const addPatternBtn = document.getElementById('addPatternBtn');
+        const logs = document.getElementById('logs');
+        const statusBox = document.getElementById('statusBox');
+        const removeFile = document.getElementById('removeFile');
+        const livePreview = document.getElementById('livePreview');
+        const matchesList = document.getElementById('matchesList');
+        const totalMatchesSpan = document.getElementById('totalMatches');
+
+        const detailsModal = document.getElementById('detailsModal');
+        const modalFileName = document.getElementById('modalFileName');
+        const modalMatchesList = document.getElementById('modalMatchesList');
+        const closeModal = document.getElementById('closeModal');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const confirmDetails = document.getElementById('confirmDetails');
+
+        let currentFile = null;
+        let fileContents = {}; 
+        let fileMatches = {}; // filename -> Array<{pattern, index, context, ignored}>
+        const ZIP_SVG = '<path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>';
+        const FILE_SVG = '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>';
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        removeFile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetApp();
+        });
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function resetApp() {
+            currentFile = null;
+            fileContents = {};
+            fileMatches = {};
+            document.getElementById('dropZoneContent').classList.remove('hidden');
+            document.getElementById('fileInfo').classList.add('hidden');
+            processBtn.disabled = true;
+            fileInput.value = '';
+            
+            // Reset patterns to one empty row
+            patternsContainer.innerHTML = '';
+            addPatternRow();
+            
+            // Reset logs to initial state
+            logs.innerHTML = `
+                <span class="text-emerald-500/40 font-mono italic">Replacer OS v2.0 initialized...</span><br>
+                <span class="text-emerald-500/40 font-mono italic">Waiting for file upload...</span>
+            `;
+            
+            // Reset live preview to initial state
+            matchesList.innerHTML = `
+                <div class="py-20 text-center flex flex-col items-center justify-center opacity-30">
+                    <svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <p class="text-xs">Esperando búsqueda...</p>
+                </div>
+            `;
+            totalMatchesSpan.textContent = '0 ENCONTRADOS';
+            totalMatchesSpan.className = "bg-slate-800 text-slate-500 text-[10px] font-black px-2 py-1 rounded-full uppercase";
+        }
+
+        function addPatternRow() {
+            const row = document.createElement('div');
+            row.className = 'pattern-row grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-900/30 rounded-xl border border-slate-800/50 relative group file-scanned';
+            row.innerHTML = `
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Patrón de Búsqueda</label>
+                    <textarea class="search-input w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-blue-400 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-800" rows="2" placeholder="Ej: <otm:DomainName>OLD</otm:DomainName>"></textarea>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Nuevo Valor</label>
+                    <textarea class="replace-input w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all placeholder:text-slate-800" rows="2" placeholder="Ej: <otm:DomainName>NEW</otm:DomainName>"></textarea>
+                </div>
+                <button class="remove-pattern absolute -top-2 -right-2 p-1.5 bg-slate-800 text-slate-500 hover:text-red-400 border border-slate-700 rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-xl">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            `;
+            
+            row.querySelector('.remove-pattern').onclick = () => {
+                if (patternsContainer.children.length > 1) {
+                    row.remove();
+                    updateLiveSearch();
+                }
+            };
+
+            row.querySelectorAll('textarea').forEach(t => t.oninput = updateLiveSearch);
+            
+            patternsContainer.appendChild(row);
+        }
+
+        addPatternBtn.addEventListener('click', addPatternRow);
+        
+        // Modal events
+        closeModal.onclick = () => detailsModal.classList.add('hidden');
+        modalOverlay.onclick = () => detailsModal.classList.add('hidden');
+        confirmDetails.onclick = () => detailsModal.classList.add('hidden');
+        
+        // Initialize first row
+        addPatternRow();
+
+        async function handleFiles(files) {
+            if (files.length > 0) {
+                currentFile = files[0];
+                fileNameDisplay.textContent = currentFile.name;
+                fileSizeDisplay.textContent = formatBytes(currentFile.size);
+                document.getElementById('dropZoneContent').classList.add('hidden');
+                document.getElementById('fileInfo').classList.remove('hidden');
+                document.getElementById('fileIcon').innerHTML = currentFile.name.endsWith('.zip') ? ZIP_SVG : FILE_SVG;
+                processBtn.disabled = false;
+                
+                await cacheFileContents();
+                updateLiveSearch();
+            }
+        }
+
+        async function cacheFileContents() {
+            fileContents = {};
+            addLog(`ANALYZING: ${currentFile.name}`);
+            
+            if (currentFile.name.endsWith('.zip')) {
+                const zip = new JSZip();
+                const loadedZip = await zip.loadAsync(currentFile);
+                const promises = [];
+                
+                loadedZip.forEach((path, file) => {
+                    if (!file.dir && /\.(xml|csv|txt|project|json)$/i.test(path)) {
+                        const p = file.async("string").then(text => {
+                            fileContents[path] = text;
+                        });
+                        promises.push(p);
+                    }
+                });
+                await Promise.all(promises);
+            } else {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        fileContents[currentFile.name] = e.target.result;
+                        resolve();
+                    };
+                    reader.readAsText(currentFile);
+                });
+            }
+            addLog("SCAN COMPLETE: MEMORY CACHED");
+        }
+
+        function updateLiveSearch() {
+            const rows = Array.from(patternsContainer.querySelectorAll('.pattern-row'));
+            const patterns = rows.map(row => row.querySelector('.search-input').value.trim()).filter(p => p !== '');
+            
+            if (!currentFile) {
+                matchesList.innerHTML = `
+                    <div class="py-20 text-center flex flex-col items-center justify-center opacity-30">
+                        <svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="text-xs">Suba un archivo para escanear</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (patterns.length === 0) {
+                matchesList.innerHTML = `
+                    <div class="py-20 text-center flex flex-col items-center justify-center opacity-30">
+                        <svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <p class="text-xs">Escriba patrones para buscar...</p>
+                    </div>
+                `;
+                totalMatchesSpan.textContent = '0 ENCONTRADOS';
+                totalMatchesSpan.className = "bg-slate-800 text-slate-500 text-[10px] font-black px-2 py-1 rounded-full uppercase";
+                return;
+            }
+
+            matchesList.innerHTML = '';
+            let total = 0;
+            const newFileMatches = {};
+
+            for (const [filename, content] of Object.entries(fileContents)) {
+                const matches = [];
+                patterns.forEach(p => {
+                    let pos = content.indexOf(p);
+                    while (pos !== -1) {
+                        // Check if we already had this match and it was ignored
+                        const wasIgnored = fileMatches[filename] && 
+                                         fileMatches[filename].find(m => m.index === pos && m.pattern === p)?.ignored;
+
+                        matches.push({
+                            pattern: p,
+                            index: pos,
+                            context: getContext(content, pos, p.length),
+                            ignored: !!wasIgnored
+                        });
+                        pos = content.indexOf(p, pos + 1);
+                    }
+                });
+
+                if (matches.length > 0) {
+                    newFileMatches[filename] = matches;
+                    total += matches.length;
+                    
+                    const activeCount = matches.filter(m => !m.ignored).length;
+
+                    const item = document.createElement('div');
+                    item.className = 'flex justify-between items-center p-3 bg-slate-900/50 border border-slate-800 rounded-xl file-scanned cursor-pointer hover:border-blue-500/50 transition-all group';
+                    item.onclick = () => showFileDetails(filename);
+                    item.innerHTML = `
+                        <div class="flex items-center space-x-3 truncate">
+                            <div class="p-1.5 bg-slate-800 rounded-lg text-slate-500 group-hover:text-blue-400 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            </div>
+                            <span class="truncate text-xs text-slate-300 font-mono" title="${filename}">${filename}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded text-[10px] border border-blue-400/20">${activeCount}</span>
+                            ${activeCount < matches.length ? `<span class="text-[9px] text-slate-500 italic">(${matches.length - activeCount} off)</span>` : ''}
+                        </div>
+                    `;
+                    matchesList.appendChild(item);
+                }
+            }
+            fileMatches = newFileMatches;
+
+            totalMatchesSpan.textContent = `${total} ENCONTRADOS`;
+            totalMatchesSpan.className = total > 0 ? 
+                "bg-blue-500/20 text-blue-400 text-[10px] font-black px-2 py-1 rounded-full uppercase" : 
+                "bg-slate-800 text-slate-500 text-[10px] font-black px-2 py-1 rounded-full uppercase";
+
+            if (total === 0) {
+                matchesList.innerHTML = '<div class="py-10 text-center text-slate-600 text-xs italic">Ninguna coincidencia encontrada.</div>';
+            }
+        }
+
+        function getContext(text, index, length) {
+            const range = 100;
+            const start = Math.max(0, index - range);
+            const end = Math.min(text.length, index + length + range);
+            
+            let prefix = text.substring(start, index);
+            let match = text.substring(index, index + length);
+            let suffix = text.substring(index + length, end);
+
+            // Escape HTML for safety
+            const esc = (str) => str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+            
+            return {
+                prefix: esc(prefix),
+                match: esc(match),
+                suffix: esc(suffix)
+            };
+        }
+
+        function showFileDetails(filename) {
+            modalFileName.textContent = filename;
+            renderModalMatches(filename);
+            detailsModal.classList.remove('hidden');
+        }
+
+        function renderModalMatches(filename) {
+            modalMatchesList.innerHTML = '';
+            const matches = fileMatches[filename] || [];
+            
+            const findReplacement = (pattern) => {
+                const rows = Array.from(patternsContainer.querySelectorAll('.pattern-row'));
+                const row = rows.find(r => r.querySelector('.search-input').value.trim() === pattern);
+                return row ? row.querySelector('.replace-input').value.trim() : '???';
+            };
+
+            matches.forEach((m, i) => {
+                const replacement = findReplacement(m.pattern);
+                const item = document.createElement('div');
+                item.className = `p-4 rounded-2xl border transition-all ${m.ignored ? 'bg-slate-900/20 border-slate-800/50 opacity-60' : 'bg-slate-900/60 border-slate-800 shadow-lg'}`;
+                item.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">PATRÓN</span>
+                            <code class="text-xs text-slate-400 font-mono">${m.pattern.length > 50 ? m.pattern.substring(0, 50) + '...' : m.pattern}</code>
+                        </div>
+                        <button class="toggle-ignore p-2 rounded-lg transition-all ${m.ignored ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}" title="${m.ignored ? 'Incluir' : 'Ignorar'}">
+                            ${m.ignored ? 
+                                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : 
+                                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+                            }
+                        </button>
+                    </div>
+                    <div class="bg-slate-950 rounded-xl p-3 font-mono text-[11px] leading-relaxed relative overflow-hidden border border-slate-900">
+                        <div class="text-slate-500 whitespace-pre-wrap">${m.context.prefix}<span class="bg-red-500/20 text-red-400 px-1 rounded mx-0.5 border border-red-500/30 line-through decoration-red-500/50">${m.context.match}</span><span class="bg-emerald-500/20 text-emerald-400 px-1 rounded mx-0.5 border border-emerald-500/30">${replacement}</span>${m.context.suffix}</div>
+                    </div>
+                `;
+                
+                item.querySelector('.toggle-ignore').onclick = () => {
+                    m.ignored = !m.ignored;
+                    renderModalMatches(filename);
+                    updateLiveSearch();
+                };
+                
+                modalMatchesList.appendChild(item);
+            });
+        }
+
+        function addLog(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'mb-1';
+            entry.innerHTML = `<span class="text-slate-600 mr-2">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        processBtn.addEventListener('click', async () => {
+            const rows = Array.from(patternsContainer.querySelectorAll('.pattern-row'));
+            const replacements = rows.map(row => ({
+                find: row.querySelector('.search-input').value.trim(),
+                replace: row.querySelector('.replace-input').value.trim()
+            })).filter(pair => pair.find !== '');
+
+            if (replacements.length === 0) return;
+
+            processBtn.disabled = true;
+            const originalText = processBtn.innerHTML;
+            processBtn.innerHTML = `
+                <div class="flex items-center justify-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    PROCESANDO...
+                </div>
+            `;
+
+            try {
+                if (currentFile.name.endsWith('.zip')) {
+                    await processZip(replacements);
+                } else {
+                    await processSingleFile(replacements);
+                }
+                addLog("TASK COMPLETED SUCCESSFULLY");
+            } catch (error) {
+                addLog(`ERROR FATAL: ${error.message}`);
+            } finally {
+                processBtn.disabled = false;
+                processBtn.textContent = "Procesar y Descargar Resultados";
+            }
+        });
+
+        async function processSingleFile(replacements) {
+            addLog("INIT SINGLE FILE REPLACEMENT");
+            let content = fileContents[currentFile.name];
+            const matches = (fileMatches[currentFile.name] || []).filter(m => !m.ignored);
+            
+            // Sort matches descending to replace from end to start without breaking indices
+            matches.sort((a, b) => b.index - a.index);
+
+            matches.forEach(m => {
+                const rep = replacements.find(r => r.find === m.pattern)?.replace || '';
+                content = content.substring(0, m.index) + rep + content.substring(m.index + m.pattern.length);
+            });
+
+            const blob = new Blob([content], { type: currentFile.type || 'text/plain' });
+            downloadFile(blob, `MODIFIED_${currentFile.name}`);
+            addLog("STREAM DOWNLOAD: FILE READY");
+        }
+
+        async function processZip(replacements) {
+            addLog("INIT ZIP BATCH PROCESSING");
+            const zip = new JSZip();
+            const loadedZip = await zip.loadAsync(currentFile);
+            const newZip = new JSZip();
+            let totalReplaced = 0;
+
+            const filePromises = [];
+            loadedZip.forEach((path, file) => {
+                if (file.dir) {
+                    newZip.folder(path);
+                    return;
+                }
+                
+                if (fileContents[path]) {
+                    let content = fileContents[path];
+                    const matches = (fileMatches[path] || []).filter(m => !m.ignored);
+
+                    if (matches.length > 0) {
+                        totalReplaced += matches.length;
+                        addLog(`MODIFIED: ${path} (${matches.length} changes)`);
+                        
+                        // Sort matches descending to replace from end to start
+                        matches.sort((a, b) => b.index - a.index);
+                        matches.forEach(m => {
+                            const rep = replacements.find(r => r.find === m.pattern)?.replace || '';
+                            content = content.substring(0, m.index) + rep + content.substring(m.index + m.pattern.length);
+                        });
+                    }
+                    
+                    newZip.file(path, content);
+                } else {
+                    const p = file.async("uint8array").then(bin => {
+                        newZip.file(path, bin);
+                    });
+                    filePromises.push(p);
+                }
+            });
+
+            await Promise.all(filePromises);
+            addLog(`BATCH FINISHED: ${totalReplaced} GLOBAL CHANGES`);
+            const blob = await newZip.generateAsync({type: "blob"});
+            downloadFile(blob, `MODIFIED_${currentFile.name}`);
+            addLog("STREAM DOWNLOAD: ZIP PACKAGE READY");
+        }
+
+        function downloadFile(blob, name) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
